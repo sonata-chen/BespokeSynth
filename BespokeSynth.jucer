@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="vxkFwd" name="BespokeSynth" projectType="guiapp" version="1.0.0"
+<JUCERPROJECT id="vxkFwd" name="BespokeSynth" projectType="audioplug" version="1.0.0"
               bundleIdentifier="com.ryanchallinor.Bespoke" includeBinaryInAppConfig="1"
               jucerVersion="5.4.7" displaySplashScreen="1" reportAppUsage="1"
-              splashScreenColour="Dark" cppLanguageStandard="11" companyCopyright="">
+              splashScreenColour="Dark" cppLanguageStandard="11" companyCopyright=""
+              pluginFormats="buildAU,buildAUv3,buildStandalone,buildVST,buildVST3"
+              pluginCharacteristicsValue="pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn">
   <MAINGROUP id="w4HLAu" name="BespokeSynth">
     <GROUP id="{531CC336-D9CD-1F6E-7272-2D8ADD98F839}" name="libraries">
       <FILE id="u46FMQ" name="PerlinNoise.h" compile="0" resource="0" file="Source/PerlinNoise.h"/>
@@ -153,6 +155,10 @@
       </GROUP>
     </GROUP>
     <GROUP id="{6E8FD6E1-BA74-3B09-455D-05C0CB629767}" name="Source">
+      <FILE id="Omjmaz" name="PluginProcessor.cpp" compile="1" resource="0"
+            file="Source/PluginProcessor.cpp"/>
+      <FILE id="XMWsjC" name="PluginProcessor.h" compile="0" resource="0"
+            file="Source/PluginProcessor.h"/>
       <GROUP id="{E0D1A2A4-1AAE-4BEB-542A-DDE85633AE4D}" name="effects">
         <FILE id="mLAQVL" name="BitcrushEffect.cpp" compile="1" resource="0"
               file="Source/BitcrushEffect.cpp"/>
@@ -889,7 +895,6 @@
             file="Source/LocationZoomer.cpp"/>
       <FILE id="Ay5Xy4" name="LocationZoomer.h" compile="0" resource="0"
             file="Source/LocationZoomer.h"/>
-      <FILE id="mMQQPx" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
       <FILE id="qVhzmD" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>
       <FILE id="Ko1j5o" name="MathUtils.cpp" compile="1" resource="0" file="Source/MathUtils.cpp"/>
@@ -1025,6 +1030,7 @@
         <MODULEPATH id="juce_audio_processors" path="../../../Downloads/JUCE/modules"/>
         <MODULEPATH id="juce_audio_utils" path="../../../Downloads/JUCE/modules"/>
         <MODULEPATH id="juce_osc" path="../../../Downloads/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../../../Downloads/JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
     <VS2015 targetFolder="Builds/VisualStudio2015" vstFolder="../VST3 SDK"
@@ -1057,6 +1063,7 @@
         <MODULEPATH id="juce_audio_formats" path="..\JUCE\modules"/>
         <MODULEPATH id="juce_audio_devices" path="..\JUCE\modules"/>
         <MODULEPATH id="juce_audio_basics" path="..\JUCE\modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="..\JUCE\modules"/>
       </MODULEPATHS>
     </VS2015>
     <LINUX_MAKE targetFolder="Builds/LinuxMakefile" extraDefs="GLEW_STATIC&#10;GL_GLEXT_PROTOTYPES&#10;BESPOKE_LINUX"
@@ -1085,6 +1092,7 @@
         <MODULEPATH id="juce_audio_formats" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_audio_devices" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_audio_basics" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../../JUCE/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
   </EXPORTFORMATS>
@@ -1092,6 +1100,8 @@
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="1"/>
     <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>

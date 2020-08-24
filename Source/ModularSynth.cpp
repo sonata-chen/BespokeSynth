@@ -91,17 +91,18 @@ bool ModularSynth::IsReady()
    return gTime > 100;
 }
 
-void ModularSynth::Setup(GlobalManagers* globalManagers, juce::Component* mainComponent)
-{
-   mGlobalManagers = globalManagers;
+void ModularSynth::SetGUI(juce::Component* mainComponent) {
    mMainComponent = mainComponent;
-   
+}
+
+void ModularSynth::Setup()
+{
    bool loaded = mUserPrefs.open(GetUserPrefsPath());
    if (loaded)
    {
-      SetGlobalBufferSize(mUserPrefs["buffersize"].asInt());
-      mIOBufferSize = gBufferSize;
-      gSampleRate = mUserPrefs["samplerate"].asInt();
+      // SetGlobalBufferSize(mUserPrefs["buffersize"].asInt());
+      // mIOBufferSize = gBufferSize;
+      // gSampleRate = mUserPrefs["samplerate"].asInt();
 
       if (!mUserPrefs["scroll_multiplier_horizontal"].isNull())
          mScrollMultiplierHorizontal = mUserPrefs["scroll_multiplier_horizontal"].asDouble();
@@ -122,9 +123,9 @@ void ModularSynth::Setup(GlobalManagers* globalManagers, juce::Component* mainCo
          mFatalError += "\nplease launch via run_bespoke.command";
 #endif
       LogEvent("couldn't find or load userprefs.json", kLogEventType_Error);
-      SetGlobalBufferSize(256);
-      mIOBufferSize = gBufferSize;
-      gSampleRate = 44100;
+      // SetGlobalBufferSize(256);
+      // mIOBufferSize = gBufferSize;
+      // gSampleRate = 44100;
    }
    
    SynthInit();
@@ -143,6 +144,10 @@ void ModularSynth::Setup(GlobalManagers* globalManagers, juce::Component* mainCo
    
    mConsoleListener = new ConsoleListener();
    mConsoleEntry = new TextEntry(mConsoleListener,"console",0,20,50,mConsoleText);
+}
+
+void ModularSynth::SetCurrentlySampleRate(int sampleRate) {  
+   gSampleRate = sampleRate;
 }
 
 void ModularSynth::LoadResources(void* nanoVG, void* fontBoundsNanoVG)
@@ -175,6 +180,7 @@ void ModularSynth::Poll()
 {
    if (!mInitialized && sFrameCount > 3) //let some frames render before blocking for a load
    {
+      Setup();
       LoadLayoutFromFile(ofToDataPath(mUserPrefs["layout"].asString()));
       mInitialized = true;
    }
@@ -1070,7 +1076,7 @@ void ModularSynth::AudioOut(float** output, int bufferSize, int nChannels)
 {
    PROFILER(audioOut_total);
    
-   if (mAudioPaused)
+   if (mAudioPaused || !mInitialized)
    {
       for (int ch=0; ch<nChannels; ++ch)
       {
@@ -1086,8 +1092,8 @@ void ModularSynth::AudioOut(float** output, int bufferSize, int nChannels)
    
    /////////// AUDIO PROCESSING STARTS HERE /////////////
    float* outBuffer[MAX_OUTPUT_CHANNELS];
-   assert(bufferSize == mIOBufferSize);
-   assert(mIOBufferSize == gBufferSize);  //need to be the same for now
+   // assert(bufferSize == mIOBufferSize);
+   // assert(mIOBufferSize == gBufferSize);  //need to be the same for now
                                           //if we want these different, need to fix outBuffer here, and also fix audioIn()
    for (int ioOffset = 0; ioOffset < mIOBufferSize; ioOffset += gBufferSize)
    {
@@ -1157,13 +1163,17 @@ void ModularSynth::AudioOut(float** output, int bufferSize, int nChannels)
 
 void ModularSynth::AudioIn(const float** input, int bufferSize, int nChannels)
 {
-   if (mAudioPaused)
+   SetGlobalBufferSize(bufferSize);
+   mIOBufferSize = gBufferSize;
+   
+   if (mAudioPaused || !mInitialized)
       return;
+   
    
    ScopedMutex mutex(&mAudioThreadMutex, "audioIn()");
 
-   assert(bufferSize == mIOBufferSize);
-   assert(nChannels <= MAX_INPUT_CHANNELS);
+   // assert(bufferSize == mIOBufferSize);
+   // assert(nChannels <= MAX_INPUT_CHANNELS);
    
    for (int i=0; i<nChannels; ++i)
    {

@@ -12,6 +12,7 @@
 #include "ModularSynth.h"
 #include "SynthGlobals.h"
 #include "Push2Control.h"  //TODO(Ryan) remove
+#include "PluginProcessor.h"
 
 #ifdef JUCE_WINDOWS
 #include <Windows.h>
@@ -22,18 +23,31 @@
  This component lives inside our window, and this is where you should put all
  your controls and content.
  */
-class MainContentComponent   : public OpenGLAppComponent,
-                               public AudioIODeviceCallback,
+
+
+class MainContentComponent   : public AudioProcessorEditor,
+                               public OpenGLRenderer,
                                public FileDragAndDropTarget,
                                private Timer
 {
 public:
    //==============================================================================
-   MainContentComponent()
-   : mLastFpsUpdateTime(0)
+   MainContentComponent(BespokeAudioProcessor &p, ModularSynth &s)
+   : AudioProcessorEditor(&p)
+   , mProcessor(p)
+   , mSynth(s)
+   , mLastFpsUpdateTime(0)
    , mFrameCountAccum(0)
    , mPixelRatio(1)
    {
+      setResizable(true,true);
+      setOpaque (true);
+      
+      /* Set this flag to improve performance. */
+      openGLContext.setComponentPaintingEnabled(false);
+      
+      openGLContext.setRenderer(this);
+      openGLContext.attachTo(*this);
       openGLContext.setOpenGLVersionRequired(juce::OpenGLContext::openGL3_2);
       openGLContext.setContinuousRepainting(false);
       
@@ -69,8 +83,7 @@ public:
    
    ~MainContentComponent()
    {
-      shutdownOpenGL();
-      shutdownAudio();
+      openGLContext.detach();
    }
    
    void timerCallback() override
@@ -96,43 +109,12 @@ public:
       ++sRenderFrame;
    }
    
-   //==============================================================================
-   void audioDeviceAboutToStart(AudioIODevice* device) override
-   {
-      // This function will be called when the audio device is started, or when
-      // its settings (i.e. sample rate, block size, etc) are changed.
-      
-      // You can use this function to initialise any resources you might need,
-      // but be careful - it will be called on the audio thread, not the GUI thread.
-   }
-   
-   void audioDeviceIOCallback(const float** inputChannelData,
-                              int numInputChannels,
-                              float** outputChannelData,
-                              int numOutputChannels,
-                              int numSamples) override
-   {
-      mSynth.AudioIn(inputChannelData, numSamples, numInputChannels);
-      mSynth.AudioOut(outputChannelData, numSamples, numOutputChannels);
-   }
-   
-   void audioDeviceStopped() override
-   {
-      
-   }
-   
-   void shutdownAudio()
-   {
-      mGlobalManagers.mDeviceManager.removeAudioCallback(this);
-      mGlobalManagers.mDeviceManager.closeAudioDevice();
-   }
-   
-   void initialise() override
+   void init()
    {
 #ifdef JUCE_WINDOWS
       glewInit();
 #endif
-      
+
       mVG = nvgCreateGLES2(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
       mFontBoundsVG = nvgCreateGLES2(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
       
@@ -145,116 +127,25 @@ public:
       
       mSynth.LoadResources(mVG, mFontBoundsVG);
       
-      /*for (auto deviceType : mGlobalManagers.mDeviceManager.getAvailableDeviceTypes())
-      {
-         ofLog() << "inputs:";
-         for (auto input : deviceType->getDeviceNames(true))
-            ofLog() << input.toStdString();
-         ofLog() << "outputs:";
-         for (auto output : deviceType->getDeviceNames(false))
-            ofLog() << output.toStdString();
-      }*/
-      
-      mSynth.Setup(&mGlobalManagers, this);
-      
-      const string kAutoDevice = "auto";
-      const string kNoneDevice = "none";
-      
-      ofxJSONElement userPrefs;
-      string outputDevice = kAutoDevice;
-      string inputDevice = kAutoDevice;
-      bool loaded = userPrefs.open(ModularSynth::GetUserPrefsPath());
-      if (loaded)
-      {
-         if (!userPrefs["audio_output_device"].isNull())
-            outputDevice = userPrefs["audio_output_device"].asString();
-         if (!userPrefs["audio_input_device"].isNull())
-            inputDevice = userPrefs["audio_input_device"].asString();
-      }
-      
-      AudioDeviceManager::AudioDeviceSetup preferredSetupOptions;
-      preferredSetupOptions.sampleRate = gSampleRate;
-      preferredSetupOptions.bufferSize = gBufferSize;
-      if (outputDevice != kAutoDevice && outputDevice != kNoneDevice)
-         preferredSetupOptions.outputDeviceName = outputDevice;
-      if (inputDevice != kAutoDevice && inputDevice != kNoneDevice)
-         preferredSetupOptions.inputDeviceName = inputDevice;
+      mSynth.SetGUI(this);
 
 #ifdef JUCE_WINDOWS
       HRESULT hr;
       hr = CoInitializeEx(0, COINIT_MULTITHREADED);
 #endif
       
-      int inputChannels = MAX_INPUT_CHANNELS;
-      int outputChannels = MAX_OUTPUT_CHANNELS;
-      
-      if (inputDevice == kNoneDevice)
-         inputChannels = 0;
-      if (outputDevice == kNoneDevice)
-         outputChannels = 0;
-
-      String audioError = mGlobalManagers.mDeviceManager.initialise(inputChannels,
-                                                                    outputChannels,
-                                                                    nullptr,
-                                                                    true,
-                                                                    "",
-                                                                    &preferredSetupOptions);
-
-      if (audioError.isEmpty())
-      {
-         auto loadedSetup = mGlobalManagers.mDeviceManager.getAudioDeviceSetup();
-         if (outputDevice != kAutoDevice && outputDevice != kNoneDevice &&
-             loadedSetup.outputDeviceName.toStdString() != outputDevice)
-         {
-            mSynth.SetFatalError("error setting output device to '"+outputDevice+"', fix this in userprefs.json (use \"auto\" for default device)"+
-                                 "\n\n\nvalid devices:\n"+GetAudioDevices());
-         }
-         else if (inputDevice != kAutoDevice && inputDevice != kNoneDevice &&
-                  loadedSetup.inputDeviceName.toStdString() != inputDevice)
-         {
-            mSynth.SetFatalError("error setting input device to '"+inputDevice+"', fix this in userprefs.json (use \"auto\" for default device, or \"none\" for no device)"+
-                                 "\n\n\nvalid devices:\n"+GetAudioDevices());
-         }
-         else if (loadedSetup.bufferSize != gBufferSize)
-         {
-            mSynth.SetFatalError("error setting buffer size to "+ofToString(gBufferSize)+" on device '"+ loadedSetup.outputDeviceName.toStdString()+"', fix this in userprefs.json" +
-                                 "\n\n(a valid buffer size might be: " + ofToString(loadedSetup.bufferSize) + ")");
-         }
-         else if (loadedSetup.sampleRate != gSampleRate)
-         {
-            mSynth.SetFatalError("error setting sample rate to "+ofToString(gSampleRate) + " on device '" + loadedSetup.outputDeviceName.toStdString() + "', fix this in userprefs.json"+
-                                 "\n\n(a valid sample rate might be: "+ofToString(loadedSetup.sampleRate)+")");
-         }
-         else
-         {
-            mGlobalManagers.mDeviceManager.addAudioCallback(this);
-            
-            ofLog() << "output: " << loadedSetup.outputDeviceName << "   input: " << loadedSetup.inputDeviceName;
-
-            SetGlobalBufferSize(loadedSetup.bufferSize);
-            SetGlobalSampleRate(loadedSetup.sampleRate);
-         }
-      }
-      else
-      {
-         if (audioError.startsWith("No such device"))
-            audioError += "\n\nfix this in userprefs.json (you can use \"auto\" for the default device)";
-         else
-            audioError += "\n\ninitialization errors could potentially be fixed by changing buffer size, sample rate, or input/output devices in userprefs.json\nto use no input device, specify \"none\" for \"audio_input_device\"";
-         mSynth.SetFatalError("error initializing audio device: "+audioError.toStdString() +
-                              "\n\n\nvalid devices:\n" + GetAudioDevices());
-      }
-      
       startTimerHz(60);
    }
    
-   void shutdown() override
+   void newOpenGLContextCreated() override { init(); }
+   
+   void openGLContextClosing() override
    {
       nvgDeleteGLES2(mVG);
       nvgDeleteGLES2(mFontBoundsVG);
    }
    
-   void render() override
+   void renderOpenGL() override
    {
       if (mSynth.IsLoadingState())
          return;
@@ -403,39 +294,18 @@ private:
       mSynth.FilesDropped(strFiles, x, y);
    }
    
-   string GetAudioDevices()
-   {
-      string ret;
-      OwnedArray<AudioIODeviceType> types;
-      mGlobalManagers.mDeviceManager.createAudioDeviceTypes(types);
-      for (int i = 0; i < types.size(); ++i)
-      {
-         String typeName(types[i]->getTypeName());  // This will be things like "DirectSound", "CoreAudio", etc.
-         types[i]->scanForDevices();                 // This must be called before getting the list of devices
-
-         ret += "output:\n";
-         {
-            StringArray deviceNames(types[i]->getDeviceNames(false));
-            for (int j = 0; j < deviceNames.size(); ++j)
-               ret += typeName.toStdString() + ": " + deviceNames[j].toStdString() + "\n";
-         }
-
-         ret += "\ninput:\n";
-         {
-            StringArray deviceNames(types[i]->getDeviceNames(true));
-            for (int j = 0; j < deviceNames.size(); ++j)
-               ret += typeName.toStdString() + ": " + deviceNames[j].toStdString() + "\n";
-         }
-
-         ret += "\n";
-      }
-      return ret;
-   }
-
-   GlobalManagers mGlobalManagers;
+   ModularSynth& mSynth;
    
-   ModularSynth mSynth;
+   /* 
+    This reference is provided as a quick way for your editor to
+    access the processor object that created it.
+    
+    Currently, this member is not be used but maybe
+    it will be useful in the future.
+   */
+   BespokeAudioProcessor &mProcessor;
    
+   OpenGLContext openGLContext;
    NVGcontext* mVG;
    NVGcontext* mFontBoundsVG;
    int64 mLastFpsUpdateTime;
@@ -445,10 +315,5 @@ private:
    
    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainContentComponent)
 };
-
-
-// (This function is called by the app startup code to create our main component)
-Component* createMainContentComponent()     { return new MainContentComponent(); }
-
 
 #endif  // MAINCOMPONENT_H_INCLUDED

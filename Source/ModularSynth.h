@@ -60,7 +60,9 @@ public:
    ModularSynth();
    virtual ~ModularSynth();
    
-   void Setup(GlobalManagers* globalManagers, juce::Component* mainComponent);
+   void SetGUI(juce::Component* mainComponent);
+   void Setup();
+   void SetCurrentlySampleRate(int sampleRate);
    void LoadResources(void* nanoVG, void* fontBoundsNanoVG);
    void Poll();
    void Draw(void* vg);
@@ -141,7 +143,7 @@ public:
    bool HasNotMovedMouseSinceClick() { return mClickStartX < INT_MAX; }
    IDrawableModule* GetMoveModule() { return mMoveModule; }
    ModuleFactory* GetModuleFactory() { return &mModuleFactory; }
-   GlobalManagers* GetGlobalManagers() { return mGlobalManagers; }
+   GlobalManagers* GetGlobalManagers() { return &mGlobalManagers; }
    juce::Component* GetMainComponent() { return mMainComponent; }
    IDrawableModule* GetLastClickedModule() const;
    EffectFactory* GetEffectFactory() { return &mEffectFactory; }
@@ -278,7 +280,7 @@ private:
    
    ofVec2f mMousePos;
    
-   GlobalManagers* mGlobalManagers;
+   GlobalManagers mGlobalManagers;
    juce::Component* mMainComponent;
    
    CriticalSection mRenderLock;
